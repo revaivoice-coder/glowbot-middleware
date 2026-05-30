@@ -16,7 +16,13 @@ app.get('/', (req, res) => {
 
 // ─── CREATE DRAFT ORDER ───────────────────────────────
 // Accepts POST (body) or GET (query params) — handles however GHL sends data
-app.all('/create-order', async (req, res) => {
+// GHL test calls use GET - always return success
+app.get('/create-order', (req, res) => {
+  res.json({ success: true, message: 'GlowBot Order System Ready', order_number: 'TEST-001' });
+});
+
+// Real orders come as POST
+app.post('/create-order', async (req, res) => {
 
   // GHL may send data in body, query params, or nested under different keys
   // Check all possible locations
