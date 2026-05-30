@@ -25,7 +25,10 @@ app.all('/create-order', async (req, res) => {
 
   // Extract data from body or query
   const customer_name    = rawBody.customer_name    || rawQuery.customer_name    || '';
-  const customer_email   = rawBody.customer_email   || rawQuery.customer_email   || '';
+  let customer_email = rawBody.customer_email || rawQuery.customer_email || '';
+if (customer_email.includes('not_provided') || customer_email.includes('example.com')) {
+  customer_email = '';
+}ƒ
   const shipping_address = rawBody.shipping_address || rawQuery.shipping_address || '';
   const product_title    = rawBody.product_title    || rawQuery.product_title    || '';
   const phone            = rawBody.phone            || rawQuery.phone            || '';
@@ -89,7 +92,7 @@ app.all('/create-order', async (req, res) => {
   // Build draft order
   const draftOrder = {
     draft_order: {
-      email: customer_email,
+email: customer_email || undefined,
       line_items: [lineItem],
       customer: {
         first_name: firstName,
