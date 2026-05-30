@@ -22,7 +22,10 @@ app.all('/create-order', async (req, res) => {
   // Check all possible locations
   const rawBody = req.body || {};
   const rawQuery = req.query || {};
-
+// Return success for GHL test calls with empty data
+  if (Object.keys(rawBody).length === 0 && Object.keys(rawQuery).length === 0) {
+    return res.json({ success: true, message: 'GlowBot Order System Ready', order_number: 'TEST-001' });
+  }
   // GHL sometimes wraps params under a 'parameters' or 'data' key
   const params = Object.keys(rawBody).length > 0 ? rawBody : rawQuery;
   const nested = rawBody.parameters || rawBody.data || rawBody.input || {};
