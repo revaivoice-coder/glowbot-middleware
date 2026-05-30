@@ -25,22 +25,30 @@ app.all('/create-order', async (req, res) => {
 
   // Extract data from body or query
   const customer_name    = rawBody.customer_name    || rawQuery.customer_name    || '';
-  let customer_email = rawBody.customer_email || rawQuery.customer_email || '';
-if (customer_email.includes('not_provided') || customer_email.includes('example.com')) {
-  customer_email = '';
-}ƒ
   const shipping_address = rawBody.shipping_address || rawQuery.shipping_address || '';
   const product_title    = rawBody.product_title    || rawQuery.product_title    || '';
   const phone            = rawBody.phone            || rawQuery.phone            || '';
+
+  // Fix email — ignore GHL placeholder values
+  let customer_email = rawBody.customer_email || rawQuery.customer_email || '';
+  if (
+    !customer_email ||
+    customer_email.includes('not_provided') ||
+    customer_email.includes('example.com') ||
+    customer_email === 'none' ||
+    customer_email === 'null'
+  ) {
+    customer_email = '';
+  }
 
   console.log('Extracted:', { customer_name, customer_email, shipping_address, product_title, phone });
 
   // If no real data return success for GHL test
   if (!customer_name && !product_title) {
-    return res.json({ 
-      success: true, 
-      message: 'GlowBot Order System Ready', 
-      order_number: 'TEST-001' 
+    return res.json({
+      success: true,
+      message: 'GlowBot Order System Ready',
+      order_number: 'TEST-001'
     });
   }
 
@@ -49,7 +57,7 @@ if (customer_email.includes('not_provided') || customer_email.includes('example.
   const firstName = nameParts[0] || 'Guest';
   const lastName  = nameParts.slice(1).join(' ') || 'Customer';
 
-  // Parse address
+  // Parse address: "123 Main St, Philadelphia, PA 19103"
   const addressParts = shipping_address.split(',');
   const address1  = (addressParts[0] || '').trim();
   const city      = (addressParts[1] || '').trim();
@@ -92,12 +100,11 @@ if (customer_email.includes('not_provided') || customer_email.includes('example.
   // Build draft order
   const draftOrder = {
     draft_order: {
-email: customer_email || undefined,
       line_items: [lineItem],
       customer: {
         first_name: firstName,
         last_name: lastName,
-        email: customer_email
+        ...(customer_email && { email: customer_email })
       },
       shipping_address: {
         first_name: firstName,
@@ -107,12 +114,17 @@ email: customer_email || undefined,
         province: province,
         zip: zip,
         country: 'US',
-        phone: phone
+        ...(phone && { phone: phone })
       },
-      note: `Order placed via GlowBot AI Voice Assistant | Phone: ${phone}`,
-      send_invoice: true
+      note: `Order placed via GlowBot AI Voice Assistant | Phone: ${phone} | Email: ${customer_email}`,
+      send_invoice: customer_email ? true : false
     }
   };
+
+  // Only add top level email if we have a valid one
+  if (customer_email) {
+    draftOrder.draft_order.email = customer_email;
+  }
 
   console.log('Sending to Shopify:', JSON.stringify(draftOrder, null, 2));
 
@@ -139,7 +151,7 @@ email: customer_email || undefined,
         order_number: order.name,
         invoice_url: order.invoice_url,
         total: order.total_price,
-        message: `Order ${order.name} placed for ${customer_name}!`
+        message: `Order ${order.name} placed for ${customer_name}! ${order.invoice_url ? 'Payment link: ' + order.invoice_url : ''}`
       });
     } else {
       console.log('Shopify error:', shopifyData);
