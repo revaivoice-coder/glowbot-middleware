@@ -3,9 +3,9 @@ const fetch = require('node-fetch');
 const app = express();
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // ─── CONFIG ───────────────────────────────────────────
-// Set these as environment variables on Render.com
 const SHOPIFY_STORE = process.env.SHOPIFY_STORE || 'glowbot-beauty-test.myshopify.com';
 const SHOPIFY_TOKEN = process.env.SHOPIFY_TOKEN || 'YOUR_ADMIN_API_TOKEN_HERE';
 
@@ -15,77 +15,89 @@ app.get('/', (req, res) => {
 });
 
 // ─── CREATE DRAFT ORDER ───────────────────────────────
-// GHL calls this endpoint with simple parameters
-// We reformat and send to Shopify
-app.post('/create-order', async (req, res) => {
-  console.log('Received order request:', req.body);
+// Accepts POST (body) or GET (query params) — handles however GHL sends data
+app.all('/create-order', async (req, res) => {
 
-  const {
-    customer_name,
-    customer_email,
-    shipping_address,
-    product_title,
-    quantity = 1,
-    price
-  } = req.body;
+  // GHL may send data in body, query params, or nested under different keys
+  // Check all possible locations
+  const rawBody = req.body || {};
+  const rawQuery = req.query || {};
 
-  // Split customer name into first and last
-  const nameParts = (customer_name || 'Guest Customer').split(' ');
-  const firstName = nameParts[0];
-  const lastName = nameParts.slice(1).join(' ') || '';
+  // GHL sometimes wraps params under a 'parameters' or 'data' key
+  const params = Object.keys(rawBody).length > 0 ? rawBody : rawQuery;
+  const nested = rawBody.parameters || rawBody.data || rawBody.input || {};
 
-  // Parse shipping address
-  // Expected format: "123 Main St, Philadelphia, PA 19103"
-  const addressParts = (shipping_address || '').split(',');
-  const address1 = (addressParts[0] || '').trim();
-  const city = (addressParts[1] || '').trim();
-  const stateZip = (addressParts[2] || '').trim().split(' ');
-  const province = stateZip[0] || '';
-  const zip = stateZip[1] || '';
+  console.log('=== INCOMING REQUEST ===');
+  console.log('Body:', JSON.stringify(rawBody, null, 2));
+  console.log('Query:', JSON.stringify(rawQuery, null, 2));
+  console.log('Method:', req.method);
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
 
-  // First search Shopify for the product to get variant ID and price
+  // Extract data from wherever it lives
+  const customer_name    = params.customer_name    || nested.customer_name    || rawQuery.customer_name    || 'Guest Customer';
+  const customer_email   = params.customer_email   || nested.customer_email   || rawQuery.customer_email   || '';
+  const shipping_address = params.shipping_address || nested.shipping_address || rawQuery.shipping_address || '';
+  const product_title    = params.product_title    || nested.product_title    || rawQuery.product_title    || 'Beauty Product';
+  const quantity         = params.quantity         || nested.quantity         || rawQuery.quantity         || 1;
+
+  console.log('Extracted data:', { customer_name, customer_email, shipping_address, product_title });
+
+  // Split name
+  const nameParts = customer_name.split(' ');
+  const firstName = nameParts[0] || 'Guest';
+  const lastName  = nameParts.slice(1).join(' ') || 'Customer';
+
+  // Parse address: "123 Main St, Philadelphia, PA 19103"
+  const addressParts = shipping_address.split(',');
+  const address1  = (addressParts[0] || '').trim();
+  const city      = (addressParts[1] || '').trim();
+  const stateZip  = (addressParts[2] || '').trim().split(' ').filter(Boolean);
+  const province  = stateZip[0] || '';
+  const zip       = stateZip[1] || '';
+
+  // Search Shopify for the product
   let lineItem = {
-    title: product_title || 'Beauty Product',
+    title: product_title,
     quantity: parseInt(quantity),
-    price: price || '0.00'
+    price: '0.00'
   };
 
   try {
-    // Search for the product in Shopify
     const searchRes = await fetch(
-      `https://${SHOPIFY_STORE}/admin/api/2024-01/products.json?title=${encodeURIComponent(product_title || '')}&limit=5`,
-      {
-        headers: {
-          'X-Shopify-Access-Token': SHOPIFY_TOKEN,
-          'Content-Type': 'application/json'
-        }
-      }
+      `https://${SHOPIFY_STORE}/admin/api/2024-01/products.json?limit=250`,
+      { headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN } }
     );
     const searchData = await searchRes.json();
 
-    if (searchData.products && searchData.products.length > 0) {
-      const product = searchData.products[0];
-      const variant = product.variants[0];
+    // Fuzzy match product title
+    const searchTerm = product_title.toLowerCase();
+    const match = searchData.products?.find(p =>
+      p.title.toLowerCase().includes(searchTerm) ||
+      searchTerm.includes(p.title.toLowerCase().split(' ')[0].toLowerCase())
+    );
+
+    if (match) {
+      const variant = match.variants[0];
       lineItem = {
         variant_id: variant.id,
         quantity: parseInt(quantity),
-        title: product.title,
+        title: match.title,
         price: variant.price
       };
-      console.log('Found product:', product.title, 'Price:', variant.price);
+      console.log('Matched product:', match.title, 'at $' + variant.price);
     }
   } catch (err) {
-    console.log('Product search failed, using manual entry:', err.message);
+    console.log('Product search error:', err.message);
   }
 
-  // Build the Shopify draft order payload
+  // Build draft order
   const draftOrder = {
     draft_order: {
       line_items: [lineItem],
       customer: {
         first_name: firstName,
         last_name: lastName,
-        email: customer_email || ''
+        email: customer_email
       },
       shipping_address: {
         first_name: firstName,
@@ -96,8 +108,8 @@ app.post('/create-order', async (req, res) => {
         zip: zip,
         country: 'US'
       },
-      note: 'Order placed via GlowBot AI Voice Assistant',
-      send_invoice: true // Automatically sends payment link to customer
+      note: `Order placed via GlowBot AI Voice Assistant | Phone: ${params.phone || ''}`,
+      send_invoice: true
     }
   };
 
@@ -120,74 +132,52 @@ app.post('/create-order', async (req, res) => {
 
     if (shopifyData.draft_order) {
       const order = shopifyData.draft_order;
-      console.log('Order created successfully:', order.id);
-
+      console.log('Order created:', order.id, order.name);
       res.json({
         success: true,
         order_id: order.id,
         order_number: order.name,
         invoice_url: order.invoice_url,
         total: order.total_price,
-        message: `Order ${order.name} created successfully! Payment link sent to ${customer_email}`
+        message: `Order ${order.name} placed for ${customer_name}! Payment link: ${order.invoice_url}`
       });
     } else {
       console.log('Shopify error:', shopifyData);
-      res.status(400).json({
-        success: false,
-        error: shopifyData.errors || 'Failed to create order',
-        details: shopifyData
-      });
+      res.status(400).json({ success: false, error: shopifyData.errors });
     }
   } catch (err) {
     console.error('Server error:', err);
-    res.status(500).json({
-      success: false,
-      error: err.message
-    });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
 // ─── CHECK INVENTORY ──────────────────────────────────
-// Optional: also proxy inventory checks
-app.get('/check-inventory', async (req, res) => {
-  const { product_title } = req.query;
+app.all('/check-inventory', async (req, res) => {
+  const product_title = req.query.product_title || req.body?.product_title || '';
 
   try {
     const searchRes = await fetch(
       `https://${SHOPIFY_STORE}/admin/api/2024-01/products.json?limit=250`,
-      {
-        headers: {
-          'X-Shopify-Access-Token': SHOPIFY_TOKEN,
-          'Content-Type': 'application/json'
-        }
-      }
+      { headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN } }
     );
     const data = await searchRes.json();
-
-    // Filter products that match the search term
-    const searchTerm = (product_title || '').toLowerCase();
+    const searchTerm = product_title.toLowerCase();
     const matches = data.products.filter(p =>
       p.title.toLowerCase().includes(searchTerm)
     );
-
-    if (matches.length > 0) {
-      const results = matches.map(p => ({
+    res.json({
+      success: true,
+      products: matches.map(p => ({
         title: p.title,
         price: p.variants[0]?.price || '0.00',
-        inventory: p.variants[0]?.inventory_quantity || 0,
-        available: (p.variants[0]?.inventory_quantity || 0) > 0
-      }));
-      res.json({ success: true, products: results });
-    } else {
-      res.json({ success: true, products: [], message: 'No products found' });
-    }
+        inventory: p.variants[0]?.inventory_quantity || 0
+      }))
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// ─── START SERVER ─────────────────────────────────────
+// ─── START ────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`GlowBot Middleware running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`GlowBot Middleware running on port ${PORT}`));
