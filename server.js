@@ -97,6 +97,7 @@ if (customer_email && !customer_email.includes('@')) {
   // Build draft order
   const draftOrder = {
     draft_order: {
+      email: customer_email,
       line_items: [lineItem],
       customer: {
         first_name: firstName,
