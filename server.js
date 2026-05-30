@@ -35,7 +35,11 @@ app.all('/create-order', async (req, res) => {
 
   // Extract data from wherever it lives
   const customer_name    = params.customer_name    || nested.customer_name    || rawQuery.customer_name    || 'Guest Customer';
-  const customer_email   = params.customer_email   || nested.customer_email   || rawQuery.customer_email   || '';
+  let customer_email = params.customer_email || nested.customer_email || rawQuery.customer_email || '';
+// Fix @ symbol if GHL stripped it (e.g. "johnatest.com" → "john@test.com")
+if (customer_email && !customer_email.includes('@')) {
+  customer_email = customer_email.replace(/([a-zA-Z0-9._%+-]+)(at|AT)([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/, '$1@$3');
+}
   const shipping_address = params.shipping_address || nested.shipping_address || rawQuery.shipping_address || '';
   const product_title    = params.product_title    || nested.product_title    || rawQuery.product_title    || 'Beauty Product';
   const quantity         = params.quantity         || nested.quantity         || rawQuery.quantity         || 1;
