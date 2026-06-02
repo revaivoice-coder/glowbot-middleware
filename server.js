@@ -29,7 +29,10 @@ app.all('/create-order', async (req, res) => {
   const product_title    = rawBody.product_title    || rawQuery.product_title    || '';
   const phone = rawBody.phone || rawQuery.phone || rawBody.Phone || rawQuery.Phone || '';
   // Fix email — ignore GHL placeholder values
-  let customer_email = rawBody.customer_email || rawQuery.customer_email || '';
+  let customer_email = rawBody.customer_email || rawQuery.customer_email || rawBody.customer_emai || rawQuery.customer_emai || '';
+  if (customer_email && !customer_email.includes('@')) {
+  customer_email = customer_email.replace(/([a-zA-Z0-9._%+-]+)(a)([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/, '$1@$3');
+}
   if (
     !customer_email ||
     customer_email.includes('not_provided') ||
