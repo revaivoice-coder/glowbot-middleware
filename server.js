@@ -27,8 +27,7 @@ app.all('/create-order', async (req, res) => {
   const customer_name    = rawBody.customer_name    || rawQuery.customer_name    || '';
   const shipping_address = rawBody.shipping_address || rawQuery.shipping_address || '';
   const product_title    = rawBody.product_title    || rawQuery.product_title    || '';
-  const phone            = rawBody.phone            || rawQuery.phone            || '';
-
+  const phone = rawBody.phone || rawQuery.phone || rawBody.Phone || rawQuery.Phone || '';
   // Fix email — ignore GHL placeholder values
   let customer_email = rawBody.customer_email || rawQuery.customer_email || '';
   if (
