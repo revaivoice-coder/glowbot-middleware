@@ -7,7 +7,8 @@ app.use(express.urlencoded({ extended: true }));
  
 const SHOPIFY_STORE = process.env.SHOPIFY_STORE || 'glowbot-beauty-test.myshopify.com';
 const SHOPIFY_TOKEN = process.env.SHOPIFY_TOKEN || 'YOUR_ADMIN_API_TOKEN_HERE';
- 
+const GHL_API_KEY = process.env.GHL_API_KEY || 'pit-3dba8527-5b0d-43fb-9a00-939bf84c9a0b';
+const GHL_LOCATION_ID = process.env.GHL_LOCATION_ID || '0-051-491'; 
 // ─── HEALTH CHECK ─────────────────────────────────────
 app.get('/', (req, res) => {
   res.json({ status: 'GlowBot Middleware is running!' });
