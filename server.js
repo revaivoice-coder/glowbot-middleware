@@ -24,7 +24,7 @@ function parseOrderItems(quantityStr, productStr) {
   // Try parsing from quantity field first (has qty + name)
   // Format: "3 Color Safe Shampoos, 2 Jamaican Black Castor Oils, 1 Deep Moisture Hair Mask"
   if (quantityStr && quantityStr.match(/\d/)) {
-    const parts = quantityStr.split(',');
+   const parts = quantityStr.split(/,|\band\b/i);
     for (const part of parts) {
       const trimmed = part.trim();
       const match = trimmed.match(/^(\d+)\s+(.+)$/);
@@ -238,7 +238,7 @@ if (phone && !phone.startsWith('+')) {
           const contactId = contactData.contact?.id || contactData.id || contactData.meta?.contactId;
           // Update contact with phone number if it was a duplicate
 if (contactData.meta?.contactId && phone) {
-  await fetch(`https://services.leadconnectorhq.com/contacts/${contactId}`, {
+  const updateRes = await fetch(`https://services.leadconnectorhq.com/contacts/${contactId}`, {
     method: 'PUT',
     headers: {
       'Authorization': `Bearer ${GHL_API_KEY}`,
@@ -247,10 +247,11 @@ if (contactData.meta?.contactId && phone) {
     },
     body: JSON.stringify({ 
       phone: phone,
-      phoneNumbers: [{ phone: phone, type: 'mobile' }]
+      locationId: GHL_LOCATION_ID
     })
   });
-  console.log('Contact phone updated to:', phone);
+  const updateData = await updateRes.json();
+  console.log('Contact update response:', JSON.stringify(updateData));
 }
 console.log('Full contact response:', JSON.stringify(contactData));
           console.log('GHL Contact created/found:', contactId);
