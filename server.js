@@ -246,9 +246,8 @@ if (contactData.meta?.contactId && phone) {
       'Version': '2021-07-28'
     },
     body: JSON.stringify({ 
-      phone: phone,
-      locationId: GHL_LOCATION_ID
-    })
+  phone: phone
+})
   });
   const updateData = await updateRes.json();
   console.log('Contact update response:', JSON.stringify(updateData));
