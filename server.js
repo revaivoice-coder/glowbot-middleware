@@ -228,7 +228,7 @@ app.all('/create-order', async (req, res) => {
             })
           });
           const contactData = await contactRes.json();
-          const contactId = contactData.contact?.id || contactData.id;
+          const contactId = contactData.contact?.id || contactData.id || contactData.meta?.contactId;
 console.log('Full contact response:', JSON.stringify(contactData));
           console.log('GHL Contact created/found:', contactId);
 
