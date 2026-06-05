@@ -229,6 +229,19 @@ app.all('/create-order', async (req, res) => {
           });
           const contactData = await contactRes.json();
           const contactId = contactData.contact?.id || contactData.id || contactData.meta?.contactId;
+          // Update contact with phone number if it was a duplicate
+if (contactData.meta?.contactId && phone) {
+  await fetch(`https://services.leadconnectorhq.com/contacts/${contactId}`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${GHL_API_KEY}`,
+      'Content-Type': 'application/json',
+      'Version': '2021-07-28'
+    },
+    body: JSON.stringify({ phone })
+  });
+  console.log('Contact phone updated');
+}
 console.log('Full contact response:', JSON.stringify(contactData));
           console.log('GHL Contact created/found:', contactId);
 
