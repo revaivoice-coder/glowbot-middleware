@@ -82,9 +82,11 @@ app.all('/create-order', async (req, res) => {
   const shipping_address = rawBody.shipping_address || rawQuery.shipping_address || '';
   const product_title    = rawBody.product_title    || rawQuery.product_title    || '';
   const quantity_str     = rawBody.quantity         || rawQuery.quantity         || '';
-  const phone            = rawBody.Phone            || rawQuery.Phone            ||
-                           rawBody.phone            || rawQuery.phone            || '';
-
+  let phone = rawBody.Phone || rawQuery.Phone || rawBody.phone || rawQuery.phone || '';
+// Format phone to E.164 (+1XXXXXXXXXX)
+if (phone && !phone.startsWith('+')) {
+  phone = '+1' + phone.replace(/\D/g, '');
+}
   // Fix email
   let customer_email = rawBody.customer_email  || rawQuery.customer_email  ||
                        rawBody.customer_emai   || rawQuery.customer_emai   || '';
