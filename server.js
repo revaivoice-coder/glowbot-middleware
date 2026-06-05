@@ -31,7 +31,12 @@ function parseOrderItems(quantityStr, productStr) {
       if (match) {
         items.push({
           qty: parseInt(match[1]),
-          name: match[2].trim().replace(/s$/, '') // remove trailing 's' for plural
+          name: match[2].trim()
+  .replace(/^bottles?\s+of\s+/i, '')
+  .replace(/^cans?\s+of\s+/i, '')
+  .replace(/^jars?\s+of\s+/i, '')
+  .replace(/^packs?\s+of\s+/i, '')
+  .replace(/s$/, '') // remove trailing 's' for plural
         });
       }
     }
@@ -240,9 +245,12 @@ if (contactData.meta?.contactId && phone) {
       'Content-Type': 'application/json',
       'Version': '2021-07-28'
     },
-    body: JSON.stringify({ phone })
+    body: JSON.stringify({ 
+      phone: phone,
+      phoneNumbers: [{ phone: phone, type: 'mobile' }]
+    })
   });
-  console.log('Contact phone updated');
+  console.log('Contact phone updated to:', phone);
 }
 console.log('Full contact response:', JSON.stringify(contactData));
           console.log('GHL Contact created/found:', contactId);
